@@ -2,6 +2,7 @@ import time
 import paho.mqtt.client as mqtt
 import datetime
 
+
 # Полив
 now = datetime.datetime.now()
 months_range = range(1, 10)  # Месяцы с мая (5) по сентябрь (9)
@@ -42,6 +43,17 @@ end_hour4 = 21    # Конец временного интервала (до 6:0
 hardhot =0 # принудитеьный свет
 minTemp=0
 # Помидоры предпочитают температуру 20–25°C днем и 16–18°C ночью.
+
+
+# Домашняя автоматизация
+# Свет в ванне
+start_hour5 = 5  # Начало временного интервала (5:00)
+end_hour5 = 8    # Конец временного интервала (до 6:00)
+
+start_hour6 = 18  # Начало временного интервала (5:00)
+end_hour6 = 0    # Конец временного интервала (до 6:00)
+
+hardlightBath =0 # принудитеьный свет
 
 
 # MQTT настройки
@@ -138,6 +150,15 @@ try:
             print("Отопление включено.")
         else:
             client.publish('teplica/hot', "7")
+
+
+        # Домашняя автоматизация #Отопление
+        # Внна включаем свет по расписанию
+        if start_hour5 <= now.hour < end_hour5 or hardhot ==1:
+            client.publish('home/bath', "1")
+            print("Свет в ванне включен")
+        else:
+            client.publish('home/bath', "2")
 
         
         
