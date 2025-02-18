@@ -78,7 +78,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
   
     // Проверяем, что сообщение пришло от нужного нам топика
-  if (strcmp(topic, "bath/modeInput") == 0 && !hardOffModeActive) { 
+  if (strcmp(topic, "teplica/modeInput")) { 
     // Проверяем, не активен ли режим hardoff. Важно если активен 
     //все остальное рубится и уходит в No action
 
@@ -86,8 +86,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
       if ((char)payload[0] == '0') {
         unsigned long currentMillis = millis();  // Получаем текущее время
         Serial.println("Mode 0 input received");
-        client.publish("bath/modeOutput", "0"); // Публикуем ответ в топик bath/mode0Output
+        client.publish("teplica/modeOutput", "0"); // Публикуем ответ в топик bath/mode0Output
         // Проверяем, прошло ли нужное время для изменения яркости
+        
+        
+        
+        
+        /*
         if (currentMillis - previousMillis >= interval) {
           // Сохраняем текущее время
           previousMillis = currentMillis;
@@ -103,13 +108,18 @@ void callback(char* topic, byte* payload, unsigned int length) {
           // Устанавливаем яркость светодиода с использованием ШИМ
           analogWrite(ledPin, brightness);
         }
+        */
     }
       
     //Mode 1
      else if ((char)payload[0] == '1') {
       unsigned long currentMillis = millis();  // Получаем текущее время
       Serial.println("Mode 1 input received");
-      client.publish("bath/modeOutput", "1"); // Публикуем ответ в топик bath/mode0Output
+      client.publish("teplica/modeOutput", "1"); // Публикуем ответ в топик bath/mode0Output
+
+
+      
+      /*
       // Проверяем, прошло ли нужное время для изменения яркости
       if (currentMillis - previousMillis >= interval) {
         // Сохраняем текущее время
@@ -126,6 +136,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         // Устанавливаем яркость светодиода с использованием ШИМ
         analogWrite(ledPin, brightness);
   }
+  */
     } 
     
     //Mode 2

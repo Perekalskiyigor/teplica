@@ -56,6 +56,14 @@ end_hour6 = 0    # Конец временного интервала (до 6:00
 hardlightBath =0 # принудитеьный свет
 
 
+# Баня
+hardBana = 1  # добавляем переменную для принудительного включения бака
+pump_start_time = None  # для отслеживания времени начала работы насоса
+pump_duration = 2 * 60  # продолжительность работы насоса в секундах (50 минут)
+# pump_interval = 10 * 60  # интервал публикации каждые 10 минут в секундах
+is_pump_active = True  # флаг для отслеживания состояния насоса
+
+
 # MQTT настройки
 BROKER = "37.79.202.158"
 PORT = 1883
@@ -160,6 +168,27 @@ try:
         else:
             client.publish('home/bath', "2")
 
+        if hardBana == 1:
+            if is_pump_active:
+                if pump_start_time is None:
+                    pump_start_time = time.time()  # Начинаем отсчет времени, только если насос включен
+                print("Баня-помпа включена.")
+                client.publish('bana/pump', "1")
+            elif time.time() - pump_start_time >= pump_duration:
+                # Ожидаем 2 минуты (время работы помпы) и выключаем насос
+                print("Баня-помпа выключена.")
+                client.publish('bana/pump', "0")
+                is_pump_active = False  # Останавливаем насос и меняем состояние
+                pump_start_time = None  # Обнуляем время начала работы насоса
+
+            # Чтобы перезапустить насос после выключения, можно добавить следующую проверку:
+            # Например, когда принудительно нужно включить насос снова, проверка может быть такая:
+            if hardBana == 1 and not is_pump_active:
+                # Перезапускаем насос
+                is_pump_active = True
+                pump_start_time = None  # Сброс времени начала работы
+                print("Перезапуск насоса.")
+                client.publish('bana/pump', "1")
         
         
  
