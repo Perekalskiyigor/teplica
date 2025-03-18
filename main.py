@@ -2,173 +2,217 @@ import time
 import paho.mqtt.client as mqtt
 import datetime
 
+# Импортируем функцию из модуля weather
+from weather import get_weather
 
 # Полив
-now = datetime.datetime.now()
-months_range = range(1, 10)  # Месяцы с мая (5) по сентябрь (9)
-start_hour = 5  # Начало временного интервала (5:00)
-end_hour = 21    # Конец временного интервала (до 6:00)
-hardwater =0 # принудитеьный полив
-# Установите автополив на 5:00–6:00 (утро) и, при необходимости, на 18:00–19:00 (вечер) датчик поставим или по погоде ориентируемся.
+months_range = range(2, 2)  # Месяцы с мая (5) по сентябрь (9)
+start_hour = 15  # Начало временного интервала (5:00)
+end_hour = 17    # Конец временного интервала (до 6:00)
+hardwater = 0  # принудительный полив
+
+# Набор воды
+months_range7 = range(2, 2)  # Месяцы с мая (5) по сентябрь (9)
+start_hour7 = 15  # Начало временного интервала (5:00)
+end_hour7 = 17    # Конец временного интервала (до 6:00)
+hardwater7 = 0  # принудительный полив
 
 # Освещение
-months_range2 = range(1, 10)  # Месяцы с мая (5) по сентябрь (9)
-start_hour2 = 5  # Начало временного интервала (5:00)
-end_hour2 = 18    # Конец временного интервала (до 18:00)
-day_status = "пасмурно"
-hardlight =0 # принудитеьный свет
-# Требуют 12–16 часов света в сутки 
-# Май: дни еще короткие, возможны заморозки и пасмурная погода.
-# Июнь–август: световой день длинный, но в пасмурные дни или при выращивании в теплице может потребоваться досветка.
-# Сентябрь: дни становятся короче, освещение необходимо для продления вегетационного периода.
 
-# Вентиляция
-months_range3 = range(1, 10)  # Месяцы с мая (5) по сентябрь (9)
+"""
+Если облачность небольшая (например, 0-50%):
+Период включения освещения: с 9:00 до 16:00.
+Использовать мощность ламп в пределах средней интенсивности, например, 300 мкмоль/м²/с для помидоров и дынь.
+Если облачность умеренная или высокая (более 50%):
+Период включения освещения: с 8:00 до 18:00.
+Увеличить мощность освещения, например, до 500 мкмоль/м²/с для помидоров и дынь.
+"""
+months_range2 = range(2, 11)  # все лето
+start_hour2 = 8  # Начало временного интервала (8:00)
+end_hour2 = 18    # Конец временного интервала (до 18:00)
+day_status = ""
+hardlight = 0  # принудительный свет
+
+# Свет на весенний период
+months_range8 = range(2, 5)  # Весной (март — апрель)
+start_hour8 = 8  # Начало временного интервала (8:00)
+end_hour8 = 18    # Конец временного интервала (до 18:00)
+
+####### Вентиляция
+months_range3 = range(2, 4)  # Месяцы с мая (5) по сентябрь (9)
 start_hour3 = 5  # Начало временного интервала (5:00)
 end_hour3 = 21    # Конец временного интервала (до 6:00)
-hardfan =0 # принудитеьный свет
-maxTemp=0
-tempteplica =0
-# Открывать форточки:
-# Для помидоров: при температуре выше 25°C.
-# Для огурцов: при температуре выше 28°C.
-# Закрывать форточки:
-# Для помидоров: при температуре ниже 20°C.
-# Для огурцов: при температуре ниже 22°C.
+hardfan = 0  # принудительный свет
+maxTemp = 0
+temperature = 0
 
 # Отопление
-months_range4 = range(1, 10)  # Месяцы с мая (5) по сентябрь (9)
+months_range4 = range(1, 2)  # Месяцы с мая (5) по сентябрь (9)
 start_hour4 = 5  # Начало временного интервала (5:00)
 end_hour4 = 21    # Конец временного интервала (до 6:00)
-hardhot =0 # принудитеьный свет
-minTemp=0
-# Помидоры предпочитают температуру 20–25°C днем и 16–18°C ночью.
-
+hardhot = 0  # принудительный свет
+minTemp = 0
 
 # Домашняя автоматизация
-# Свет в ванне
 start_hour5 = 5  # Начало временного интервала (5:00)
 end_hour5 = 8    # Конец временного интервала (до 6:00)
 
 start_hour6 = 18  # Начало временного интервала (5:00)
 end_hour6 = 0    # Конец временного интервала (до 6:00)
 
-hardlightBath =0 # принудитеьный свет
-
+hardlightBath = 0  # принудительный свет
 
 # Баня
 hardBana = 1  # добавляем переменную для принудительного включения бака
 pump_start_time = None  # для отслеживания времени начала работы насоса
 pump_duration = 2 * 60  # продолжительность работы насоса в секундах (50 минут)
-# pump_interval = 10 * 60  # интервал публикации каждые 10 минут в секундах
 is_pump_active = True  # флаг для отслеживания состояния насоса
-
 
 # MQTT настройки
 BROKER = "37.79.202.158"
 PORT = 1883
-TOPIC_PUBLISH = "teplica/out/mode"
 TOPIC_PUBLISH1 = "teplica/out/status"
-TOPIC_SUBSCRIBE = "teplica/in/relayPump"
-TOPIC_SUBSCRIBE1 = "teplica/in/inputSensor"
-TOPIC_SUBSCRIBE2 = "teplica/in/TemmpSensor"
-water =0
-
-
-# Функция обратного вызова для обработки сообщений
-def on_message(client, userdata, msg):
-    global water
-    payload = msg.payload.decode("utf-8")
-    if msg.topic == TOPIC_SUBSCRIBE:
-        if payload == "1":
-            print("Включен насос")
-    if msg.topic == TOPIC_SUBSCRIBE1:
-        if payload == "1":
-            water = 1
-    if msg.topic == TOPIC_SUBSCRIBE2:
-        if payload == "1":
-            water = 1
-            
-        else:
-            water = 0
-
+waterSensor = "teplica/in/waterSensor"
+TempSensor = "teplica/in/TempSensor"
+MoisterSensor = "teplica/in/TemmpSensorMoisterSensor"
 
 # Создание MQTT клиента
 client = mqtt.Client()
 
-# Установка функций обратного вызова
+# Инициализация переменных
+water = 1 # 0 нет воды в бочке
+temperature = 0
+moister = 0
+
+# Функция обработки полученных сообщений
+def on_message(client, userdata, message):
+    global water
+    global temperature
+    global moister
+    print(f"****{message.topic}")
+
+    if message.topic == waterSensor:
+        # Получаем данные с датчика уровня воды
+        water = int(message.payload.decode())
+        print(f"Уровень воды: {water}")
+
+    elif message.topic == TempSensor:
+        # Получаем температуру с датчика температуры
+        temperature = float(message.payload.decode())
+        print(f"Температура в теплице: {temperature}")
+
+    elif message.topic == MoisterSensor:
+        # Получаем данные с датчика влажности
+        moister = float(message.payload.decode())
+        print(f"Влажность почвы: {moister}")
+
+
+# Устанавливаем функцию обработки сообщений
 client.on_message = on_message
 
-try:
-    # Подключение к брокеру
+
+# Подключение и подписка на топики
+def connect_and_subscribe():
     client.connect(BROKER, PORT, keepalive=60)
+    client.subscribe(waterSensor)
+    client.subscribe(TempSensor)
+    client.subscribe(MoisterSensor)
 
-    # Подписка на топики
-    client.subscribe(TOPIC_SUBSCRIBE)
-    client.subscribe(TOPIC_SUBSCRIBE1)
 
-    # Запуск цикла обработки сообщений в отдельном потоке
-    client.loop_start()
 
+# Подключаемся и подписываемся на топики
+connect_and_subscribe()
+
+# Запуск цикла обработки сообщений в отдельном потоке
+client.loop_start()
+
+
+
+# Ваш API ключ
+api_key = "c491a9ce74952b873e20b5bf2d8a5a7e"
+
+# Координаты для Екатеринбурга, Белоярский район, поселок Прохладный
+latitude = 56.8519   # Широта
+longitude = 60.6367  # Долгота
+
+
+try:
     while True:
+        # Обновление времени
+        now = datetime.datetime.now()
+
+        # Получение данных о погоде
+        weather_info = get_weather(api_key, latitude, longitude)
+
+        # Вывод информации о погоде
+        if isinstance(weather_info, dict):
+            print(f"Погода в {weather_info['city']}:")
+            print(f"Описание: {weather_info['description']}")
+            day_status = weather_info['description']
+            print(f"Температура: {weather_info['temperature']}°C")
+            print(f"Влажность: {weather_info['humidity']}%")
+            print(f"Скорость ветра: {weather_info['wind_speed']} м/с")
+        else:
+            print(weather_info)
+
+
         # Публикация сообщения в топик
         client.publish(TOPIC_PUBLISH1, "ok")
         print(f"Опубликовано в {TOPIC_PUBLISH1}: ok")
 
         # Задержка на 5 секунд
         time.sleep(5)
-        named_tuple = time.localtime() # получить struct_time
+        named_tuple = time.localtime()  # получить struct_time
         time_string = time.strftime("%m/%H:%M")
 
-        #Полив
-        # Проверяем, что месяц в заданном интервале и время в пределах 5:00 - 6:00
-        if now.month in months_range and start_hour <= now.hour < end_hour or hardwater ==1:
+        ########################## Полив
+        # Проверяем, что месяц в заданном интервале и время в пределах 15:00 - 17:00
+        if now.month in months_range and start_hour <= now.hour < end_hour or hardwater == 1:
             client.publish('teplica/waterPump', "1")
-            print("Полив включено.")
+            print("Полив включен.")
         else:
-            client.publish('teplica/waterPump', "6")
+            client.publish('teplica/waterPump', "0")
 
-        #Наолнение воды
-        if now.month in months_range and start_hour <= now.hour < end_hour and water ==0:
-            client.publish('teplica/waterValve', '3')
+        ########################## Набор воды
+        if now.month in months_range7 and start_hour7 <= now.hour < end_hour7 and water == 0:
+            client.publish('teplica/waterValve', '1')
             print("Набор воды в бочку включен.")
         else:
-            client.publish('teplica/waterValve', '7')
+            client.publish('teplica/waterValve', '0')
 
-        #Освещение
-        # Проверяем, что месяц в заданном интервале и время в пределах 7:00 - 21:00 смртрим по апи прогоноз если пасмурно
-        if now.month in months_range2 and start_hour2 <= now.hour < end_hour2 and day_status == 'пасмурно' or hardlight ==1:
-            client.publish('teplica/light', "2")
+        ########################### Освещение
+        # (Автомат по погоде) Если облачность небольшая (например, 0-50%): Период включения освещения: с 9:00 до 18:00
+        if now.month in months_range2 and start_hour2 <= now.hour < end_hour2 and day_status == 'небольшая облачность' or hardlight == 1:
+            client.publish('teplica/light', "1")
             print("Освещение включено.")
         else:
-            client.publish('teplica/light', "7")
+            client.publish('teplica/light', "0")
 
-        #Вентиляция
-        # Проверяем, что месяц в заданном интервале и время в пределах 7:00 - 21:00 смртрим температуру
-        if now.month in months_range3 and start_hour3 <= now.hour < end_hour3 and tempteplica > maxTemp or hardfan ==1:
-            client.publish('teplica/fan', "2")
-            print("Вентиляция включено.")
+        # Весной (март — апрель):
+        # Рекомендуемое время для досвечивания: с 8:00 до 18:00  в пасмурные дни или в случае, если освещенность ниже досвечиваем.
+        if now.month in months_range8 and start_hour8 <= now.hour < end_hour8 and day_status in 'облачность' or hardlight == 1:
+            client.publish('teplica/light', "1")
+            print("Освещение включено.")
         else:
-            client.publish('teplica/fan', "7")
-        
-        #Отопление
-        # Проверяем, что месяц в заданном интервале и время в пределах 7:00 - 21:00 смртрим по апи температуру
-        if now.month in months_range4 and start_hour4 <= now.hour < end_hour4 and tempteplica >= minTemp or hardhot ==1:
-            client.publish('teplica/hot', "2")
+            client.publish('teplica/light', "0")
+
+        # Вентиляция
+        if now.month in months_range3 and start_hour3 <= now.hour < end_hour3 and temperature > maxTemp or hardfan == 1:
+            client.publish('teplica/fan', "1")
+            print("Вентиляция включена.")
+        else:
+            client.publish('teplica/fan', "0")
+
+        # Отопление
+        if now.month in months_range4 and start_hour4 <= now.hour < end_hour4 and temperature <= minTemp or hardhot == 1:
+            client.publish('teplica/hot', "1")
             print("Отопление включено.")
         else:
-            client.publish('teplica/hot', "7")
+            client.publish('teplica/hot', "0")
 
-
-        # Домашняя автоматизация #Отопление
-        # Внна включаем свет по расписанию
-        if start_hour5 <= now.hour < end_hour5 or hardhot ==1:
-            client.publish('home/bath', "1")
-            print("Свет в ванне включен")
-        else:
-            client.publish('home/bath', "2")
-
-        if hardBana == 1:
+        
+        """
+                if hardBana == 1:
             if is_pump_active:
                 if pump_start_time is None:
                     pump_start_time = time.time()  # Начинаем отсчет времени, только если насос включен
@@ -189,6 +233,9 @@ try:
                 pump_start_time = None  # Сброс времени начала работы
                 print("Перезапуск насоса.")
                 client.publish('bana/pump', "1")
+        """
+        
+
         
         
  
