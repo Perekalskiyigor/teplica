@@ -106,7 +106,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   
   
   ///////////////////////Наолнение воды///////////////////////////////////
-  if (strcmp(topic, "teplica/waterPump/in") == 0) { 
+  if (strcmp(topic, "waterValve/in") == 0) { 
     // Проверяем, не активен ли режим hardoff. Важно если активен 
     //все остальное рубится и уходит в No action
 
@@ -157,7 +157,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 
   ///////////////////////#Вентиляция///////////////////////////////////
-  if (strcmp(topic, "teplica/light/in") == 0) { 
+  if (strcmp(topic, "teplica/fan/in") == 0) { 
     // Проверяем, не активен ли режим hardoff. Важно если активен 
     //все остальное рубится и уходит в No action
 
@@ -184,7 +184,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 
  ///////////////////////#Отопление///////////////////////////////////
-  if (strcmp(topic, "teplica/light/in") == 0) { 
+  if (strcmp(topic, "teplica/hot/in") == 0) { 
     // Проверяем, не активен ли режим hardoff. Важно если активен 
     //все остальное рубится и уходит в No action
 
