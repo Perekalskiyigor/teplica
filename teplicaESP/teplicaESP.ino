@@ -30,6 +30,9 @@ bool hardOffModeActive = true;
 unsigned long lastRestartTime = 0; // Время последней перезагрузки
 const unsigned long RESTART_INTERVAL = 7200000; // Интервал 2 часа в миллисекундах
 
+unsigned long previousMillis = 0;  // Переменная для отслеживания времени
+const long interval = 2000;         // Интервал 5 секунд
+
 
 // Данные для подключения к Wi-Fi
 const char* ssid = "UFSB";
@@ -79,166 +82,109 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println();
 
   
-    ////////////////////////// Полив//////////////////////////
-  if (strcmp(topic, "teplica/waterPump/in") == 0) { 
-    // Проверяем, не активен ли режим hardoff. Важно если активен 
-    //все остальное рубится и уходит в No action
-
-    
-          if ((char)payload[0] == '0') {
-          // digitalWrite(Buzzer_PIN, HIGH); // Зуммер
-          //Выключить полив
-          Serial.println("teplica/waterPump/in 0");
-          client.publish("teplica/waterPump/out", "0"); 
-          // Здесь код для реле на отключение
-          digitalWrite(Watering, LOW); // Полив выключен
-        } 
-        else if ((char)payload[0] == '1') { 
-          //Включить полив
-          Serial.println("teplica/waterPump/in 1");
-          client.publish("teplica/waterPump/out", "1");
-          digitalWrite(Watering, HIGH); // Полив включен
-        } 
-        else { // Блок else без условия
-          //Serial.println("No action for waterPump");
-        }
-  }
-  
-  
-  ///////////////////////Наолнение воды///////////////////////////////////
-  if (strcmp(topic, "waterValve/in") == 0) { 
-    // Проверяем, не активен ли режим hardoff. Важно если активен 
-    //все остальное рубится и уходит в No action
-
-    
-          if ((char)payload[0] == '0') {
-          // digitalWrite(Buzzer_PIN, HIGH); // Зуммер
-          //Выключить наполнение воды
-          Serial.println("teplica/waterValve/in 0");
-          client.publish("teplica/waterValve/out", "0"); 
-          // Здесь код для реле на отключение
-          digitalWrite(water_filling, LOW);
-        } 
-        else if ((char)payload[0] == '1') { // Добавьте условие для Mode 1
-          //Включить наполнение воды
-          Serial.println("teplica/waterPump/in 1");
-          client.publish("teplica/waterPump/out", "1");
-          digitalWrite(water_filling, HIGH);
-        } 
-        else { // Блок else без условия
-          //Serial.println("No action for waterPump");
-        }
-  }
-
- ///////////////////////#Освещение///////////////////////////////////
-  if (strcmp(topic, "teplica/light/in") == 0) { 
-    // Проверяем, не активен ли режим hardoff. Важно если активен 
-    //все остальное рубится и уходит в No action
-
-    
-          if ((char)payload[0] == '0') {
-          // digitalWrite(Buzzer_PIN, HIGH); // Зуммер
-          //Выключить свет
-          Serial.println("teplica/light/in 0");
-          client.publish("teplica/light/out", "0"); 
-          // Здесь код для реле на отключение
-          digitalWrite(lighting, LOW);
-        } 
-        else if ((char)payload[0] == '1') { // Добавьте условие для Mode 1
-          //Включить свет
-          Serial.println("teplica/light/in 1");
-          client.publish("teplica/light/out", "1");
-          digitalWrite(lighting, HIGH);
-        } 
-        else { // Блок else без условия
-          //Serial.println("No action for waterPump");
-        }
-  }
-
-
-  ///////////////////////#Вентиляция///////////////////////////////////
-  if (strcmp(topic, "teplica/fan/in") == 0) { 
-    // Проверяем, не активен ли режим hardoff. Важно если активен 
-    //все остальное рубится и уходит в No action
-
-   
-          if ((char)payload[0] == '0') {
-          // digitalWrite(Buzzer_PIN, HIGH); // Зуммер
-          //Выключить вентиляцию
-          Serial.println("teplica/fan/in 0");
-          client.publish("teplica/fan/out", "0"); 
-          // Здесь код для реле на отключение
-          digitalWrite(ventilation, LOW);
-        } 
-        else if ((char)payload[0] == '1') { // Добавьте условие для Mode 1
-          //Выключить наполнение воды
-          Serial.println("teplica/fan/in 1");
-          client.publish("teplica/light/out", "1");
-          digitalWrite(ventilation, HIGH);
-        } 
-        else { // Блок else без условия
-          //Serial.println("No action for waterPump");
-        }
-  }
-
-
-
- ///////////////////////#Отопление///////////////////////////////////
-  if (strcmp(topic, "teplica/hot/in") == 0) { 
-    // Проверяем, не активен ли режим hardoff. Важно если активен 
-    //все остальное рубится и уходит в No action
-
-    //Полив режимы
-          if ((char)payload[0] == '0') {
-          // digitalWrite(Buzzer_PIN, HIGH); // Зуммер
-          //Выключить Отопление
-          Serial.println("teplica/hot/in 0");
-          client.publish("teplica/hot/out", "0"); 
-          // Здесь код для реле на отключение
-          digitalWrite(heating, LOW);
-        } 
-        else if ((char)payload[0] == '1') { // Добавьте условие для Mode 1
-          //Включить Отопление
-          Serial.println("teplica/hot/in 1");
-          client.publish("teplica/hot/out", "1");
-          digitalWrite(heating, HIGH);
-        } 
-        else { // Блок else без условия
-          //Serial.println("No action for waterPump");
-        }
-  }
-}
-
-unsigned long nextConnectionAttempt = 0;
-
-void reconnect() {
-  while (!client.connected()) {
-    unsigned long now = millis();
-    if (now >= nextConnectionAttempt) {
-      Serial.print("Попытка подключения к MQTT...");
-      String clientId = "ESP8266Client-";
-      clientId += String(random(0xffff), HEX);
-      if (client.connect(clientId.c_str())) {
-        Serial.println("подключено");
-        
-        // /////////////////Подписываемся на топик//////////////////////////
-        client.subscribe("teplica/hardoff"); 
-        client.subscribe("teplica/waterPump/in");
-        client.subscribe("teplica/waterValve/in");
-        client.subscribe("teplica/light/in");
-        client.subscribe("teplica/fan/in");
-        client.subscribe("teplica/hot/in");
-        
-        nextConnectionAttempt = millis() + 5000; // Следующая попытка через 5 секунд
-      } else {
-        Serial.print("Не удалось подключиться, rc=");
-        Serial.print(client.state());
-        Serial.println(" попробовать снова через 5 секунд");
-        nextConnectionAttempt = millis() + 5000; // Следующая попытка через 5 секунд
-      }
+    ///////////////////// Полив ////////////////////////
+    if (strcmp(topic, "teplica/waterPump/in") == 0) { 
+      if ((char)payload[0] == '0') {
+        Serial.println("teplica/waterPump/in 0");
+        client.publish("teplica/waterPump/out", "0"); 
+        // Здесь код для реле на отключение
+        digitalWrite(Watering, HIGH); // Полив выключен (активный низкий сигнал)
+      } 
+      else if ((char)payload[0] == '1') {
+        Serial.println("teplica/waterPump/in 1");
+        client.publish("teplica/waterPump/out", "1");
+        digitalWrite(Watering, LOW); // Полив включен (активный низкий сигнал)
+      } 
     }
-    delay(100); // Меньший интервал для более плавного выполнения
-  }
+      
+    ///////////////////// Наполнение воды ////////////////////////
+    if (strcmp(topic, "teplica/waterValve/in") == 0) { 
+      if ((char)payload[0] == '0') {
+        Serial.println("teplica/waterValve/in 0");
+        client.publish("teplica/waterValve/out", "0"); 
+        digitalWrite(water_filling, HIGH); // Выключить наполнение воды (активный низкий сигнал)
+      } 
+      else if ((char)payload[0] == '1') { 
+        Serial.println("teplica/waterValve/in 1");
+        client.publish("teplica/waterValve/out", "1");
+        digitalWrite(water_filling, LOW); // Включить наполнение воды (активный низкий сигнал)
+      } 
+    }
+    
+    ///////////////////// Освещение ///////////////////////
+    if (strcmp(topic, "teplica/light/in") == 0) { 
+      if ((char)payload[0] == '0') {
+        Serial.println("teplica/light/in 0");
+        client.publish("teplica/light/out", "0"); 
+        digitalWrite(lighting, HIGH); // Выключить свет (активный низкий сигнал)
+      } 
+      else if ((char)payload[0] == '1') { 
+        Serial.println("teplica/light/in 1");
+        client.publish("teplica/light/out", "1");
+        digitalWrite(lighting, LOW); // Включить свет (активный низкий сигнал)
+      } 
+    }
+    
+    ///////////////////// Вентиляция ///////////////////////
+    if (strcmp(topic, "teplica/fan/in") == 0) { 
+      if ((char)payload[0] == '0') {
+        Serial.println("teplica/fan/in 0");
+        client.publish("teplica/fan/out", "0"); 
+        digitalWrite(ventilation, HIGH); // Выключить вентиляцию (активный низкий сигнал)
+      } 
+      else if ((char)payload[0] == '1') { 
+        Serial.println("teplica/fan/in 1");
+        client.publish("teplica/fan/out", "1");
+        digitalWrite(ventilation, LOW); // Включить вентиляцию (активный низкий сигнал)
+      } 
+    }
+    
+    ///////////////////// Отопление ///////////////////////
+    if (strcmp(topic, "teplica/hot/in") == 0) { 
+      if ((char)payload[0] == '0') {
+        Serial.println("teplica/hot/in 0");
+        client.publish("teplica/hot/out", "0"); 
+        digitalWrite(heating, HIGH); // Выключить отопление (активный низкий сигнал)
+      } 
+      else if ((char)payload[0] == '1') { 
+        Serial.println("teplica/hot/in 1");
+        client.publish("teplica/hot/out", "1");
+        digitalWrite(heating, LOW); // Включить отопление (активный низкий сигнал)
+      } 
+    }
+    }
+    
+    unsigned long nextConnectionAttempt = 0;
+    
+    void reconnect() {
+      while (!client.connected()) {
+        unsigned long now = millis();
+        if (now >= nextConnectionAttempt) {
+          Serial.print("Попытка подключения к MQTT...");
+          String clientId = "ESP8266Client-";
+          clientId += String(random(0xffff), HEX);
+          if (client.connect(clientId.c_str())) {
+            Serial.println("подключено");
+            
+            // /////////////////Подписываемся на топик//////////////////////////
+            client.subscribe("teplica/hardoff"); 
+            client.subscribe("teplica/waterPump/in");
+            client.subscribe("teplica/waterValve/in");
+            client.subscribe("teplica/light/in");
+            client.subscribe("teplica/fan/in");
+            client.subscribe("teplica/hot/in");
+            client.subscribe("teplica/waterValve/in");
+            
+            nextConnectionAttempt = millis() + 5000; // Следующая попытка через 5 секунд
+          } else {
+            Serial.print("Не удалось подключиться, rc=");
+            Serial.print(client.state());
+            Serial.println(" попробовать снова через 5 секунд");
+            nextConnectionAttempt = millis() + 5000; // Следующая попытка через 5 секунд
+          }
+        }
+        delay(100); // Меньший интервал для более плавного выполнения
+      }
 }
 
 void setup() {
@@ -255,7 +201,16 @@ void setup() {
   pinMode(heating, OUTPUT);
   pinMode(water_filling, OUTPUT);
   
-  pinMode(SensorWater, INPUT); 
+  pinMode(SensorWater, INPUT_PULLUP); 
+
+  // Отключаем все по умолчанию
+  digitalWrite(Watering, HIGH);
+  digitalWrite(lighting, HIGH);
+  digitalWrite(ventilation, HIGH);
+  digitalWrite(heating, HIGH);
+  digitalWrite(water_filling, HIGH);
+   
+  
 
 
   
@@ -305,13 +260,24 @@ void loop() {
   }
 
 
-  // Каждые 5 секунд и публикуем состояние датчика воды
-  if (millis() % 5000 == 0) { // Проверяем каждые 10 секун
-    int relayLevel = digitalRead(SensorWater);
-    Serial.print("relay: ");
-    Serial.println(relayLevel);
-    client.publish("teplica/SensorWater", String(relayLevel).c_str()); // Публикуем состояние реле
-  }
+    // Каждые 5 секунд и публикуем состояние датчика воды
+    unsigned long currentMillis = millis();
+    
+    // Проверяем, прошло ли 5 секунд
+    if (currentMillis - previousMillis >= interval) {
+      // Сохраняем время последней публикации
+      previousMillis = currentMillis;
+      
+      // Читаем значение с датчика
+      int relayLevel = digitalRead(SensorWater);
+      
+      // Выводим для отладки
+      Serial.print("SensorWater: ");
+      Serial.println(relayLevel);
+      
+      // Публикуем состояние датчика
+      client.publish("teplica/SensorWater", String(relayLevel).c_str());
+    }
   
     // Проверка на необходимость перезагрузки каждые 4 часа
     if (millis() - lastRestartTime >= RESTART_INTERVAL) {
