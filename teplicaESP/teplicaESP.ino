@@ -19,22 +19,25 @@ ESP8266HTTPUpdateServer httpUpdater;
 #define ventilation D4 //Вентиляция
 #define heating D5     // Обогрев
 #define water_filling D6 //Наполнение воды
-
 #define SensorWater D7 //Датчик уровня воды
 
+// Флаги режимов
+bool autoMode = false; // false - обычный режим, true - авторежим (управление с P-топиков)
 
-// Глобальная переменная для отслеживания состояния режима hardoff
-bool hardOffModeActive = true; 
+// Глобальные переменные для контроля наполнения воды в бак
+bool fillingActive = false;
+unsigned long fillStartTime = 0;
+const unsigned long FILL_TIMEOUT = 7200000; // 2 часа в миллисекундах
 
-// Определение глобальной переменной в начало. Таймер рестарта 2 часа
+
+// Таймеры
 unsigned long lastRestartTime = 0; // Время последней перезагрузки
 const unsigned long RESTART_INTERVAL = 7200000; // Интервал 2 часа в миллисекундах
-
 unsigned long previousMillis = 0;  // Переменная для отслеживания времени
 const long interval = 2000;         // Интервал 5 секунд
 
 
-// Данные для подключения к Wi-Fi
+// Настройки WiFi и MQTT
 const char* ssid = "UFSB";
 const char* password = "Fnkfynblf!(*&14";
 const char* mqtt_server = "37.79.202.158";
@@ -82,77 +85,199 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println();
 
   
-    ///////////////////// Полив ////////////////////////
-    if (strcmp(topic, "teplica/waterPump/in") == 0) { 
-      if ((char)payload[0] == '0') {
-        Serial.println("teplica/waterPump/in 0");
-        client.publish("teplica/waterPump/out", "0"); 
-        // Здесь код для реле на отключение
-        digitalWrite(Watering, HIGH); // Полив выключен (активный низкий сигнал)
-      } 
-      else if ((char)payload[0] == '1') {
-        Serial.println("teplica/waterPump/in 1");
-        client.publish("teplica/waterPump/out", "1");
-        digitalWrite(Watering, LOW); // Полив включен (активный низкий сигнал)
-      } 
+  //Реализован авто режим, когда мы его получаем, контроллер игнрирует сервер и полностью управляется с телефона
+  // Обработка топика режима
+  if (strcmp(topic, "teplica/mode") == 0) {
+    if ((char)payload[0] == '1') {
+      autoMode = true;
+      Serial.println("Активирован авторежим (управление через P-топики)");
+      client.publish("teplica/mode/status", "1");
+    } else {
+      autoMode = false;
+      Serial.println("Обычный режим управления");
+      client.publish("teplica/mode/status", "0");
     }
-      
-    ///////////////////// Наполнение воды ////////////////////////
-    if (strcmp(topic, "teplica/waterValve/in") == 0) { 
-      if ((char)payload[0] == '0') {
-        Serial.println("teplica/waterValve/in 0");
-        client.publish("teplica/waterValve/out", "0"); 
-        digitalWrite(water_filling, HIGH); // Выключить наполнение воды (активный низкий сигнал)
-      } 
-      else if ((char)payload[0] == '1') { 
-        Serial.println("teplica/waterValve/in 1");
-        client.publish("teplica/waterValve/out", "1");
-        digitalWrite(water_filling, LOW); // Включить наполнение воды (активный низкий сигнал)
-      } 
-    }
+    return;
+  }
+
+    // Обработка команд управления с учетом режима
+  if (!autoMode) {
     
-    ///////////////////// Освещение ///////////////////////
-    if (strcmp(topic, "teplica/light/in") == 0) { 
-      if ((char)payload[0] == '0') {
-        Serial.println("teplica/light/in 0");
-        client.publish("teplica/light/out", "0"); 
-        digitalWrite(lighting, HIGH); // Выключить свет (активный низкий сигнал)
-      } 
-      else if ((char)payload[0] == '1') { 
-        Serial.println("teplica/light/in 1");
-        client.publish("teplica/light/out", "1");
-        digitalWrite(lighting, LOW); // Включить свет (активный низкий сигнал)
-      } 
-    }
+        ///////////////////// Полив ////////////////////////
+        if (strcmp(topic, "teplica/waterPump/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/waterPump/in 0");
+            client.publish("teplica/waterPump/out", "0"); 
+            client.publish("teplica/log", "Полив выключен");
+            // Здесь код для реле на отключение
+            digitalWrite(Watering, HIGH); // Полив выключен (активный низкий сигнал)
+          } 
+          else if ((char)payload[0] == '1') {
+            Serial.println("teplica/waterPump/in 1");
+            client.publish("teplica/waterPump/out", "1");
+            digitalWrite(Watering, LOW); // Полив включен (активный низкий сигнал)
+            client.publish("teplica/log", "Полив включен");
+          } 
+        }
+          
+        ///////////////////// Наполнение воды ////////////////////////
+        if (strcmp(topic, "teplica/waterValve/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/waterValve/in 0");
+            client.publish("teplica/waterValve/out", "0"); 
+            digitalWrite(water_filling, HIGH); // Выключить наполнение воды (активный низкий сигнал)
+            fillingActive = false;
+            client.publish("teplica/log", "Наполнение воды выключено P");
+          } 
+          else if ((char)payload[0] == '1') { 
+            Serial.println("teplica/waterValve/in 1");
+            digitalWrite(water_filling, LOW); // Включить наполнение
+            fillingActive = true;
+            fillStartTime = millis();
+            client.publish("teplica/waterValve/out", "1");
+            client.publish("teplica/log", "Наполнение воды включено");
+          } 
+        }
+        
+        ///////////////////// Освещение ///////////////////////
+        if (strcmp(topic, "teplica/light/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/light/in 0");
+            client.publish("teplica/light/out", "0"); 
+            digitalWrite(lighting, HIGH); // Выключить свет (активный низкий сигнал)
+            client.publish("teplica/log", "Свет выключен");
+          } 
+          else if ((char)payload[0] == '1') { 
+            Serial.println("teplica/light/in 1");
+            client.publish("teplica/light/out", "1");
+            digitalWrite(lighting, LOW); // Включить свет (активный низкий сигнал)
+            client.publish("teplica/log", "Свет включен");
+          } 
+        }
+        
+        ///////////////////// Вентиляция ///////////////////////
+        if (strcmp(topic, "teplica/fan/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/fan/in 0");
+            client.publish("teplica/fan/out", "0"); 
+            digitalWrite(ventilation, HIGH); // Выключить вентиляцию (активный низкий сигнал)
+            client.publish("teplica/log", "Вентилятор выключен");
+          } 
+          else if ((char)payload[0] == '1') { 
+            Serial.println("teplica/fan/in 1");
+            client.publish("teplica/fan/out", "1");
+            digitalWrite(ventilation, LOW); // Включить вентиляцию (активный низкий сигнал)
+            client.publish("teplica/log", "Вентилятор включен");
+          } 
+        }
+        
+        ///////////////////// Отопление ///////////////////////
+        if (strcmp(topic, "teplica/hot/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/hot/in 0");
+            client.publish("teplica/hot/out", "0"); 
+            digitalWrite(heating, HIGH); // Выключить отопление (активный низкий сигнал)
+            client.publish("teplica/log", "Отопление выключено");
+          } 
+          else if ((char)payload[0] == '1') { 
+            Serial.println("teplica/hot/in 1");
+            client.publish("teplica/hot/out", "1");
+            digitalWrite(heating, LOW); // Включить отопление (активный низкий сигнал)
+            client.publish("teplica/log", "Отопление включено");
+          } 
+        }
+        } else {
+        //////////////////////////////////////////////////////////////////////////////////////////
+        // Авторежим (управление через P-топики)
+        /////////////////////////////////////////////////////////////////////////////////////////
+        
+        ///////////////////// Полив ////////////////////////
+        if (strcmp(topic, "teplica/PwaterPump/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/PwaterPump/in 0");
+            client.publish("teplica/PwaterPump/out", "0"); 
+            client.publish("teplica/log", "P Полив выключен");
+            // Здесь код для реле на отключение
+            digitalWrite(Watering, HIGH); // Полив выключен (активный низкий сигнал)
+          } 
+          else if ((char)payload[0] == '1') {
+            Serial.println("teplica/PwaterPump/in 1");
+            client.publish("teplica/PwaterPump/out", "1");
+            digitalWrite(Watering, LOW); // Полив включен (активный низкий сигнал)
+            client.publish("teplica/log", "Полив включен P");
+          } 
+        }
+          
+        ///////////////////// Наполнение воды ////////////////////////
+        if (strcmp(topic, "teplica/PwaterValve/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/PwaterValve/in 0");
+            client.publish("teplica/PwaterValve/out", "0"); 
+            digitalWrite(water_filling, HIGH); // Выключить наполнение воды (активный низкий сигнал)
+            fillingActive = false;
+            client.publish("teplica/log", "Наполнение воды выключено P");
+          } 
+          else if ((char)payload[0] == '1') { 
+            Serial.println("teplica/PwaterValve/in 1");
+            digitalWrite(water_filling, LOW); // Включить наполнение
+            fillingActive = true;
+            fillStartTime = millis();
+            client.publish("teplica/PwaterValve/out", "1");
+            client.publish("teplica/log", "Наполнение воды включено P");
+          } 
+        }
+        
+        ///////////////////// Освещение ///////////////////////
+        if (strcmp(topic, "teplica/Plight/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/Plight/in 0");
+            client.publish("teplica/Plight/out", "0"); 
+            digitalWrite(lighting, HIGH); // Выключить свет (активный низкий сигнал)
+            client.publish("teplica/log", "Свет выключен P");
+          } 
+          else if ((char)payload[0] == '1') { 
+            Serial.println("teplica/Plight/in 1");
+            client.publish("teplica/Plight/out", "1");
+            digitalWrite(lighting, LOW); // Включить свет (активный низкий сигнал)
+            client.publish("teplica/log", "Свет включен P");
+          } 
+        }
+        
+        ///////////////////// Вентиляция ///////////////////////
+        if (strcmp(topic, "teplica/Pfan/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/Pfan/in 0");
+            client.publish("teplica/Pfan/out", "0"); 
+            digitalWrite(ventilation, HIGH); // Выключить вентиляцию (активный низкий сигнал)
+            client.publish("teplica/log", "Вентилятор выключен P");
+          } 
+          else if ((char)payload[0] == '1') { 
+            Serial.println("teplica/Pfan/in 1");
+            client.publish("teplica/Pfan/out", "1");
+            digitalWrite(ventilation, LOW); // Включить вентиляцию (активный низкий сигнал)
+            client.publish("teplica/log", "Вентилятор включен P");
+          } 
+        }
+        
+        ///////////////////// Отопление ///////////////////////
+        if (strcmp(topic, "teplica/Phot/in") == 0) { 
+          if ((char)payload[0] == '0') {
+            Serial.println("teplica/Phot/in 0");
+            client.publish("teplica/Phot/out", "0"); 
+            digitalWrite(heating, HIGH); // Выключить отопление (активный низкий сигнал)
+            client.publish("teplica/log", "Отопление выключено P");
+          } 
+          else if ((char)payload[0] == '1') { 
+            Serial.println("teplica/Phot/in 1");
+            client.publish("teplica/Phot/out", "1");
+            digitalWrite(heating, LOW); // Включить отопление (активный низкий сигнал)
+            client.publish("teplica/log", "Отопление включено P");
+          } 
+        }
     
-    ///////////////////// Вентиляция ///////////////////////
-    if (strcmp(topic, "teplica/fan/in") == 0) { 
-      if ((char)payload[0] == '0') {
-        Serial.println("teplica/fan/in 0");
-        client.publish("teplica/fan/out", "0"); 
-        digitalWrite(ventilation, HIGH); // Выключить вентиляцию (активный низкий сигнал)
-      } 
-      else if ((char)payload[0] == '1') { 
-        Serial.println("teplica/fan/in 1");
-        client.publish("teplica/fan/out", "1");
-        digitalWrite(ventilation, LOW); // Включить вентиляцию (активный низкий сигнал)
-      } 
-    }
-    
-    ///////////////////// Отопление ///////////////////////
-    if (strcmp(topic, "teplica/hot/in") == 0) { 
-      if ((char)payload[0] == '0') {
-        Serial.println("teplica/hot/in 0");
-        client.publish("teplica/hot/out", "0"); 
-        digitalWrite(heating, HIGH); // Выключить отопление (активный низкий сигнал)
-      } 
-      else if ((char)payload[0] == '1') { 
-        Serial.println("teplica/hot/in 1");
-        client.publish("teplica/hot/out", "1");
-        digitalWrite(heating, LOW); // Включить отопление (активный низкий сигнал)
-      } 
-    }
-    }
+     }
+ }
+
     
     unsigned long nextConnectionAttempt = 0;
     
@@ -167,13 +292,21 @@ void callback(char* topic, byte* payload, unsigned int length) {
             Serial.println("подключено");
             
             // /////////////////Подписываемся на топик//////////////////////////
-            client.subscribe("teplica/hardoff"); 
+            client.subscribe("teplica/mode");
+            
+            // Подписки для обычного режима
             client.subscribe("teplica/waterPump/in");
             client.subscribe("teplica/waterValve/in");
             client.subscribe("teplica/light/in");
             client.subscribe("teplica/fan/in");
             client.subscribe("teplica/hot/in");
-            client.subscribe("teplica/waterValve/in");
+
+            // Подписки для авторежима
+            client.subscribe("teplica/PwaterPump/in");
+            client.subscribe("teplica/PwaterValve/in");
+            client.subscribe("teplica/Plight/in");
+            client.subscribe("teplica/Pfan/in");
+            client.subscribe("teplica/Phot/in");
             
             nextConnectionAttempt = millis() + 5000; // Следующая попытка через 5 секунд
           } else {
@@ -190,29 +323,27 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void setup() {
 
   //Прошивка удаленно
+  // Настройка OTA
   httpUpdater.setup(&HttpServer, OTAPATH, OTAUSER, OTAPASSWORD);
   HttpServer.onNotFound(handleNotFound);
   HttpServer.begin();
 
-  //Пины выхода
+  // Настройка пинов
   pinMode(Watering, OUTPUT);
   pinMode(lighting, OUTPUT); 
   pinMode(ventilation, OUTPUT);
   pinMode(heating, OUTPUT);
   pinMode(water_filling, OUTPUT);
-  
   pinMode(SensorWater, INPUT_PULLUP); 
 
-  // Отключаем все по умолчанию
+  // Инициализация всех реле в выключенное состояние
   digitalWrite(Watering, HIGH);
   digitalWrite(lighting, HIGH);
   digitalWrite(ventilation, HIGH);
   digitalWrite(heating, HIGH);
   digitalWrite(water_filling, HIGH);
    
-  
-
-
+ 
   
   Serial.begin(115200);
   setup_wifi();
@@ -279,12 +410,34 @@ void loop() {
       client.publish("teplica/SensorWater", String(relayLevel).c_str());
     }
   
-    // Проверка на необходимость перезагрузки каждые 4 часа
+    // Проверка на необходимость перезагрузки каждые 2 часа
     if (millis() - lastRestartTime >= RESTART_INTERVAL) {
-    Serial.println("Автоматическая перезагрузка через 4 часа");
-    client.publish("teplica/log", "Auto reboot after 4 hours");
+    Serial.println("Автоматическая перезагрузка через 2 часа");
+    client.publish("teplica/log", "Автоматическая перезагрузка через 2 часа");
     ESP.restart(); // Перезагрузка контроллера
   }
+
+  //// Проверка датчика воды и таймаута наполнения для 2 режимов
+      if (fillingActive) {
+        if (digitalRead(SensorWater) == 1) {
+            digitalWrite(water_filling, HIGH);
+            fillingActive = false;
+            String outTopic = autoMode ? "teplica/PwaterValve/out" : "teplica/waterValve/out";
+            client.publish(outTopic.c_str(), "0");
+            client.publish("teplica/log", autoMode ? 
+                "Автоотключение: вода достигла уровня P режим" : 
+                "Автоотключение: вода достигла уровня");
+        }
+        else if (millis() - fillStartTime >= FILL_TIMEOUT) {
+            digitalWrite(water_filling, HIGH);
+            fillingActive = false;
+            String outTopic = autoMode ? "teplica/PwaterValve/out" : "teplica/waterValve/out";
+            client.publish(outTopic.c_str(), "0");
+            client.publish("teplica/log", autoMode ? 
+                "Автоотключение: сработал таймаут 2 часа P режим" : 
+                "Автоотключение: сработал таймаут 2 часа");
+        }
+    }
 }
 
 //Для удаленной прошивки
