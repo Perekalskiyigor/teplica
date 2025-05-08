@@ -195,14 +195,14 @@ void callback(char* topic, byte* payload, unsigned int length) {
         if (strcmp(topic, "teplica/PwaterPump/in") == 0) { 
           if ((char)payload[0] == '0') {
             Serial.println("teplica/PwaterPump/in 0");
-            client.publish("teplica/PwaterPump/out", "0"); 
+            client.publish("teplica/waterPump/out", "0"); 
             client.publish("teplica/log", "P Полив выключен");
             // Здесь код для реле на отключение
             digitalWrite(Watering, HIGH); // Полив выключен (активный низкий сигнал)
           } 
           else if ((char)payload[0] == '1') {
             Serial.println("teplica/PwaterPump/in 1");
-            client.publish("teplica/PwaterPump/out", "1");
+            client.publish("teplica/waterPump/out", "1");
             digitalWrite(Watering, LOW); // Полив включен (активный низкий сигнал)
             client.publish("teplica/log", "Полив включен P");
           } 
@@ -212,7 +212,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
         if (strcmp(topic, "teplica/PwaterValve/in") == 0) { 
           if ((char)payload[0] == '0') {
             Serial.println("teplica/PwaterValve/in 0");
-            client.publish("teplica/PwaterValve/out", "0"); 
+            client.publish("teplica/waterValve/out", "0"); 
             digitalWrite(water_filling, HIGH); // Выключить наполнение воды (активный низкий сигнал)
             fillingActive = false;
             client.publish("teplica/log", "Наполнение воды выключено P");
@@ -222,7 +222,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
             digitalWrite(water_filling, LOW); // Включить наполнение
             fillingActive = true;
             fillStartTime = millis();
-            client.publish("teplica/PwaterValve/out", "1");
+            client.publish("teplica/waterValve/out", "1");
             client.publish("teplica/log", "Наполнение воды включено P");
           } 
         }
@@ -231,13 +231,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
         if (strcmp(topic, "teplica/Plight/in") == 0) { 
           if ((char)payload[0] == '0') {
             Serial.println("teplica/Plight/in 0");
-            client.publish("teplica/Plight/out", "0"); 
+            client.publish("teplica/light/out", "0"); 
             digitalWrite(lighting, HIGH); // Выключить свет (активный низкий сигнал)
             client.publish("teplica/log", "Свет выключен P");
           } 
           else if ((char)payload[0] == '1') { 
             Serial.println("teplica/Plight/in 1");
-            client.publish("teplica/Plight/out", "1");
+            client.publish("teplica/light/out", "1");
             digitalWrite(lighting, LOW); // Включить свет (активный низкий сигнал)
             client.publish("teplica/log", "Свет включен P");
           } 
@@ -247,13 +247,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
         if (strcmp(topic, "teplica/Pfan/in") == 0) { 
           if ((char)payload[0] == '0') {
             Serial.println("teplica/Pfan/in 0");
-            client.publish("teplica/Pfan/out", "0"); 
+            client.publish("teplica/fan/out", "0"); 
             digitalWrite(ventilation, HIGH); // Выключить вентиляцию (активный низкий сигнал)
             client.publish("teplica/log", "Вентилятор выключен P");
           } 
           else if ((char)payload[0] == '1') { 
             Serial.println("teplica/Pfan/in 1");
-            client.publish("teplica/Pfan/out", "1");
+            client.publish("teplica/fan/out", "1");
             digitalWrite(ventilation, LOW); // Включить вентиляцию (активный низкий сигнал)
             client.publish("teplica/log", "Вентилятор включен P");
           } 
@@ -263,13 +263,13 @@ void callback(char* topic, byte* payload, unsigned int length) {
         if (strcmp(topic, "teplica/Phot/in") == 0) { 
           if ((char)payload[0] == '0') {
             Serial.println("teplica/Phot/in 0");
-            client.publish("teplica/Phot/out", "0"); 
+            client.publish("teplica/hot/out", "0"); 
             digitalWrite(heating, HIGH); // Выключить отопление (активный низкий сигнал)
             client.publish("teplica/log", "Отопление выключено P");
           } 
           else if ((char)payload[0] == '1') { 
             Serial.println("teplica/Phot/in 1");
-            client.publish("teplica/Phot/out", "1");
+            client.publish("teplica/hot/out", "1");
             digitalWrite(heating, LOW); // Включить отопление (активный низкий сигнал)
             client.publish("teplica/log", "Отопление включено P");
           } 
