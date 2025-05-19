@@ -1,20 +1,28 @@
 import time
 import paho.mqtt.client as mqtt
 import datetime
+import logging
+
+# Настройка логгера
+logging.basicConfig(
+    filename="teplica.log",
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
 # Импортируем функцию из модуля weather
 from weather import get_weather
 
 # Полив
-months_range = range(2, 2)  # Месяцы с мая (5) по сентябрь (9)
-start_hour = 15  # Начало временного интервала (5:00)
-end_hour = 17    # Конец временного интервала (до 6:00)
+months_range = range(5, 10)  # Месяцы с мая (5) по сентябрь (9)
+start_hour = 5  # Начало временного интервала (5:00)
+end_hour = 7    # Конец временного интервала (до 6:00)
 hardwater = 0  # принудительный полив
 
 # Набор воды
-months_range7 = range(2, 2)  # Месяцы с мая (5) по сентябрь (9)
-start_hour7 = 15  # Начало временного интервала (5:00)
-end_hour7 = 17    # Конец временного интервала (до 6:00)
+months_range7 = range(5, 10)  # Месяцы с мая (5) по сентябрь (9)
+start_hour7 = 9  # Начало временного интервала (5:00)
+end_hour7 = 12    # Конец временного интервала (до 6:00)
 hardwater7 = 0  # принудительный полив
 
 # Освещение
@@ -27,31 +35,30 @@ hardwater7 = 0  # принудительный полив
 Период включения освещения: с 8:00 до 18:00.
 Увеличить мощность освещения, например, до 500 мкмоль/м²/с для помидоров и дынь.
 """
-months_range2 = range(2, 11)  # все лето
+months_range2 = range(5, 11)  # все лето
 start_hour2 = 8  # Начало временного интервала (8:00)
 end_hour2 = 18    # Конец временного интервала (до 18:00)
 day_status = ""
 hardlight = 0  # принудительный свет
 
 # Свет на весенний период
-months_range8 = range(2, 5)  # Весной (март — апрель)
+months_range8 = range(5, 11)  # Весной (март — апрель)
 start_hour8 = 8  # Начало временного интервала (8:00)
 end_hour8 = 18    # Конец временного интервала (до 18:00)
 
 ####### Вентиляция
-months_range3 = range(2, 4)  # Месяцы с мая (5) по сентябрь (9)
+months_range3 = range(5, 10)  # Месяцы с мая (5) по сентябрь (9)
 start_hour3 = 5  # Начало временного интервала (5:00)
 end_hour3 = 21    # Конец временного интервала (до 6:00)
 hardfan = 0  # принудительный свет
-maxTemp = 0
+maxTemp = 30
 temperature = 0
 
 # Отопление
-months_range4 = range(1, 2)  # Месяцы с мая (5) по сентябрь (9)
+months_range4 = range(5, 10)  # Месяцы с мая (5) по сентябрь (9)
 start_hour4 = 5  # Начало временного интервала (5:00)
 end_hour4 = 21    # Конец временного интервала (до 6:00)
-hardhot = 0  # принудительный свет
-minTemp = 0
+minTemp = 16
 
 # Домашняя автоматизация
 start_hour5 = 5  # Начало временного интервала (5:00)
@@ -72,8 +79,8 @@ is_pump_active = True  # флаг для отслеживания состоян
 BROKER = "37.79.202.158"
 PORT = 1883
 TOPIC_PUBLISH1 = "teplica/out/status"
-waterSensor = "teplica/in/waterSensor"
-TempSensor = "teplica/in/TempSensor"
+waterSensor = "teplica/SensorWater"
+TempSensor = "teplica/TempSensor"
 MoisterSensor = "teplica/in/TemmpSensorMoisterSensor"
 
 # Создание MQTT клиента
@@ -84,27 +91,27 @@ water = 1 # 0 нет воды в бочке
 temperature = 0
 moister = 0
 
-# Функция обработки полученных сообщений
 def on_message(client, userdata, message):
-    global water
-    global temperature
-    global moister
-    print(f"****{message.topic}")
+    global water, temperature, moister
+    topic = message.topic
+    payload = message.payload.decode()
 
-    if message.topic == waterSensor:
-        # Получаем данные с датчика уровня воды
-        water = int(message.payload.decode())
+    print(f"****{topic}")
+
+    if topic == waterSensor:
+        water = int(payload)
         print(f"Уровень воды: {water}")
+        logging.info(f"[MQTT] Уровень воды: {water}")
 
-    elif message.topic == TempSensor:
-        # Получаем температуру с датчика температуры
-        temperature = float(message.payload.decode())
+    elif topic == TempSensor:
+        temperature = float(payload)
         print(f"Температура в теплице: {temperature}")
+        logging.info(f"[MQTT] Температура: {temperature}")
 
-    elif message.topic == MoisterSensor:
-        # Получаем данные с датчика влажности
-        moister = float(message.payload.decode())
+    elif topic == MoisterSensor:
+        moister = float(payload)
         print(f"Влажность почвы: {moister}")
+        logging.info(f"[MQTT] Влажность почвы: {moister}")
 
 
 # Устанавливаем функцию обработки сообщений
@@ -150,15 +157,19 @@ try:
             print(f"Описание: {weather_info['description']}")
             day_status = weather_info['description']
             print(f"Температура: {weather_info['temperature']}°C")
+            temperature = weather_info['temperature']
             print(f"Влажность: {weather_info['humidity']}%")
             print(f"Скорость ветра: {weather_info['wind_speed']} м/с")
+
+            logging.info(f"Погода: {day_status}, Темп: {temperature}°C, Влажн: {weather_info['humidity']}%, Ветер: {weather_info['wind_speed']} м/с")
         else:
             print(weather_info)
+            logging.warning(f"Ошибка погоды: {weather_info}")
 
-
-        # Публикация сообщения в топик
         client.publish(TOPIC_PUBLISH1, "ok")
         print(f"Опубликовано в {TOPIC_PUBLISH1}: ok")
+        logging.info(f"Публикация: {TOPIC_PUBLISH1} → ok")
+
 
         # Задержка на 5 секунд
         time.sleep(5)
@@ -167,48 +178,61 @@ try:
 
         ########################## Полив
         # Проверяем, что месяц в заданном интервале и время в пределах 15:00 - 17:00
-        if now.month in months_range and start_hour <= now.hour < end_hour or hardwater == 1:
-            client.publish('teplica/waterPump', "1")
+        if now.month in months_range and start_hour <= now.hour < end_hour:
+            client.publish('teplica/waterPump/in', "1")
             print("Полив включен.")
+            logging.info("Полив включен.")
         else:
-            client.publish('teplica/waterPump', "0")
+            client.publish('teplica/waterPump/in', "0")
+            print("Полив выключен.")
+            logging.info("Полив выключен.")
 
         ########################## Набор воды
         if now.month in months_range7 and start_hour7 <= now.hour < end_hour7 and water == 0:
-            client.publish('teplica/waterValve', '1')
+            client.publish('teplica/waterValve/in', '1')
             print("Набор воды в бочку включен.")
+            logging.info("Набор воды в бочку включен.")
         else:
-            client.publish('teplica/waterValve', '0')
+            client.publish('teplica/waterValve/in', '0')
+            print("Набор воды в бочку выключен.")
+            logging.info("Набор воды в бочку выключен.")
 
         ########################### Освещение
-        # (Автомат по погоде) Если облачность небольшая (например, 0-50%): Период включения освещения: с 9:00 до 18:00
-        if now.month in months_range2 and start_hour2 <= now.hour < end_hour2 and day_status == 'небольшая облачность' or hardlight == 1:
-            client.publish('teplica/light', "1")
+        # Объединенное условие освещения для весны и лета
+        if (
+            ("облачно" in day_status.lower()) and
+            (
+                (now.month in months_range2 and start_hour2 <= now.hour < end_hour2) or
+                (now.month in months_range8 and start_hour8 <= now.hour < end_hour8)
+            )
+        ):
+            client.publish('teplica/light/in', "1")
             print("Освещение включено.")
+            logging.info(f"Освещение включено — статус дня: {day_status}, время: {now.hour}")
         else:
-            client.publish('teplica/light', "0")
-
-        # Весной (март — апрель):
-        # Рекомендуемое время для досвечивания: с 8:00 до 18:00  в пасмурные дни или в случае, если освещенность ниже досвечиваем.
-        if now.month in months_range8 and start_hour8 <= now.hour < end_hour8 and day_status in 'облачность' or hardlight == 1:
-            client.publish('teplica/light', "1")
-            print("Освещение включено.")
-        else:
-            client.publish('teplica/light', "0")
+            client.publish('teplica/light/in', "0")
+            print("Освещение выключено.")
+            logging.info(f"Освещение выключено — статус дня: {day_status}, время: {now.hour}")
 
         # Вентиляция
-        if now.month in months_range3 and start_hour3 <= now.hour < end_hour3 and temperature > maxTemp or hardfan == 1:
-            client.publish('teplica/fan', "1")
+        if now.month in months_range3 and start_hour3 <= now.hour < end_hour3 and temperature > maxTemp:
+            client.publish('teplica/fan/in', "1")
             print("Вентиляция включена.")
+            logging.info(f"Вентиляция включена — температура: {temperature}°C, порог: {maxTemp}°C")
         else:
-            client.publish('teplica/fan', "0")
+            client.publish('teplica/fan/in', "0")
+            print("Вентиляция выключена.")
+            logging.info(f"Вентиляция выключена — температура: {temperature}°C, порог: {maxTemp}°C")
 
         # Отопление
-        if now.month in months_range4 and start_hour4 <= now.hour < end_hour4 and temperature <= minTemp or hardhot == 1:
-            client.publish('teplica/hot', "1")
+        if now.month in months_range4 and start_hour4 <= now.hour < end_hour4 and temperature <= minTemp:
+            client.publish('teplica/hot/in', "1")
             print("Отопление включено.")
+            logging.info(f"Отопление включено — температура: {temperature}°C, порог: {minTemp}°C")
         else:
-            client.publish('teplica/hot', "0")
+            client.publish('teplica/hot/in', "0")
+            print("Отопление выключено.")
+            logging.info(f"Отопление выключено — температура: {temperature}°C, порог: {minTemp}°C")
 
         
         """
