@@ -148,7 +148,7 @@ try:
         # Обновление времени
         now = datetime.datetime.now()
 
-        print(f"HELLLLLOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+        print(f"2HELLLLLOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
 
         # Получение данных о погоде
         weather_info = get_weather(api_key, latitude, longitude)
