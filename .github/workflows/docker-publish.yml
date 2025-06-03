@@ -1,0 +1,27 @@
+name: Build and Push Docker Image to Docker Hub
+
+on:
+  push:
+    branches:
+      - main  # Измени, если твоя рабочая ветка — master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Клонируем код
+        uses: actions/checkout@v3
+
+      - name: Логинимся в Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USER }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Собираем и пушим образ
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: your_dockerhub_username/teplica_mqtt:latest
