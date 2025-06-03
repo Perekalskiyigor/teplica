@@ -56,8 +56,8 @@ temperature = 0
 
 # Отопление
 months_range4 = range(5, 10)  # Месяцы с мая (5) по сентябрь (9)
-start_hour4 = 5  # Начало временного интервала (5:00)
-end_hour4 = 21    # Конец временного интервала (до 6:00)
+start_hour4 = 1  # Начало временного интервала (5:00)
+end_hour4 = 23    # Конец временного интервала (до 6:00)
 minTemp = 16
 
 # Домашняя автоматизация
@@ -148,6 +148,8 @@ try:
         # Обновление времени
         now = datetime.datetime.now()
 
+        print(f"HELLLLLOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+
         # Получение данных о погоде
         weather_info = get_weather(api_key, latitude, longitude)
 
@@ -200,7 +202,7 @@ try:
         ########################### Освещение
         # Объединенное условие освещения для весны и лета
         if (
-            ("облачно" in day_status.lower()) and
+            ("облачно" in day_status.lower() or "дожд" in day_status.lower() or "пасмурно" in day_status.lower()) and
             (
                 (now.month in months_range2 and start_hour2 <= now.hour < end_hour2) or
                 (now.month in months_range8 and start_hour8 <= now.hour < end_hour8)

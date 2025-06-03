@@ -1,0 +1,22 @@
+# Кеши и временные файлы Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Виртуальное окружение
+venv/
+.env/
+.env
+
+# Логи
+*.log
+
+# IDE-шные файлы
+.vscode/
+.idea/
+*.swp
+
+# Системные файлы
+.DS_Store
+Thumbs.db
