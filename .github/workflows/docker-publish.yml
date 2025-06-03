@@ -24,4 +24,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: your_dockerhub_username/teplica_mqtt:latest
+          tags: perekalskiyigor/teplica_mqtt:latest
