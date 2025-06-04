@@ -1,6 +1,7 @@
 import time
 import paho.mqtt.client as mqtt
 import datetime
+from zoneinfo import ZoneInfo
 import logging
 
 # Настройка логгера
@@ -146,9 +147,9 @@ longitude = 60.6367  # Долгота
 try:
     while True:
         # Обновление времени
-        now = datetime.datetime.now()
+        now = datetime.now(ZoneInfo("Asia/Yekaterinburg"))
 
-        print(f"2HELLLLLOOOOOOOOOOOOOOOOOOOOOOOOOOOOO")
+        print(f"2HELLLLL{now}")
 
         # Получение данных о погоде
         weather_info = get_weather(api_key, latitude, longitude)
