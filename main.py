@@ -1,6 +1,6 @@
 import time
 import paho.mqtt.client as mqtt
-import datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
 
