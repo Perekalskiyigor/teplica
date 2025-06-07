@@ -194,11 +194,11 @@ try:
         # Проверяем, что месяц в заданном интервале и время в пределах 05:00 - 07:00 и четный
         if (now.month in months_range9 and start_hour9 <= now.hour < end_hour9 and
             now.day % 2 == 0): 
-            client.publish('teplica/waterPumpStreet/in', "1")
+            client.publish('waterSystem/PSystemWater/in', "1")
             print("Полив на улице включен.")
             logging.info("Полив на улице включен.")
         else:
-            client.publish('teplica/waterPumpStreet/in', "0")
+            client.publish('waterSystem/PSystemWater/in', "0")
             print("Полив на улице выключен.")
             logging.info("Полив на улице выключен.")
 
