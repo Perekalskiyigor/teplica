@@ -189,16 +189,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
         }
 
         ///////////////////// Полив огорода ///////////////////////
-        if (strcmp(topic, "waterSystem/SystemWater/in") == 0) { 
+        if (strcmp(topic, "waterSystem/Valve1/in") == 0) { 
           if ((char)payload[0] == '0') {
-            Serial.println("waterSystem/SystemWater/in 0");
-            client.publish("waterSystem/SystemWater/out", "0"); 
+            Serial.println("waterSystem/Valve1/in 0");
+            client.publish("waterSystem/Valve1/out", "0"); 
             digitalWrite(SystemWaterValve, LOW); // Выключить полив (активный низкий сигнал)
             client.publish("waterSystem/log", "Полив огорода выключено");
           } 
           else if ((char)payload[0] == '1') { 
-            Serial.println("waterSystem/SystemWater/in 1");
-            client.publish("waterSystem/SystemWater/out", "1");
+            Serial.println("waterSystem/Valve1/in 1");
+            client.publish("waterSystem/Valve1/out", "1");
             digitalWrite(SystemWaterValve, HIGH); // Включить полив огорода (активный низкий сигнал)
             client.publish("waterSystem/log", "Полив огорода включено");
           } 
@@ -293,16 +293,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
         }
 
         ///////////////////// Полив огорода ///////////////////////
-        if (strcmp(topic, "waterSystem/PSystemWater/in") == 0) { 
+        if (strcmp(topic, "waterSystem/PValve1/in") == 0) { 
           if ((char)payload[0] == '0') {
-            Serial.println("waterSystem/PSystemWater/in 0");
-            client.publish("waterSystem/SystemWater/out", "0"); 
+            Serial.println("waterSystem/PValve1/in 0");
+            client.publish("waterSystem/Valve1/out", "0"); 
             digitalWrite(SystemWaterValve, LOW); // Выключить полив (активный низкий сигнал)
             client.publish("waterSystem/log", "Полив огорода выключено");
           } 
           else if ((char)payload[0] == '1') { 
-            Serial.println("waterSystem/PSystemWater/in 1");
-            client.publish("waterSystem/PSystemWaterValve/out", "1");
+            Serial.println("waterSystem/PValve1/in 1");
+            client.publish("waterSystem/Valve1/out", "1");
             digitalWrite(SystemWaterValve, HIGH); // Включить полив огорода (активный низкий сигнал)
             client.publish("waterSystem/log", "Полив огорода включено");
           } 
@@ -333,7 +333,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
             client.subscribe("waterSystem/light/in");
             client.subscribe("waterSystem/fan/in");
             client.subscribe("waterSystem/hot/in");
-            client.subscribe("waterSystem/SystemWater/in");
+            client.subscribe("waterSystem/Valve1/in");
 
             // Подписки для авторежима
             client.subscribe("waterSystem/PwaterPump/in");
@@ -341,7 +341,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
             client.subscribe("waterSystem/Plight/in");
             client.subscribe("waterSystem/Pfan/in");
             client.subscribe("waterSystem/Phot/in");
-            client.subscribe("waterSystem/PSystemWater/in");
+            client.subscribe("waterSystem/PValve1/in");
             
             nextConnectionAttempt = millis() + 5000; // Следующая попытка через 5 секунд
           } else {
@@ -378,7 +378,7 @@ void setup() {
   digitalWrite(ventilation, HIGH);
   digitalWrite(heating, HIGH);
   digitalWrite(water_filling, HIGH);
-  digitalWrite(SystemWaterValve, HIGH);
+  digitalWrite(SystemWaterValve, LOW);
    
  
   
