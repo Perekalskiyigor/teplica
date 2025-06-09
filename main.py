@@ -264,9 +264,10 @@ try:
 
         
         # Баня управление паром
+
         if hardBana == 1:
-            logging.debug(f"Pump logic: now={now}, current_time={current_time}, last_pump_time={last_pump_time}, active={is_pump_active}")
             current_time = time.time()
+            logging.debug(f"Pump logic: now={now}, current_time={current_time}, last_pump_time={last_pump_time}, active={is_pump_active}")
             # Проверка: прошло ли 5 минут с последнего запуска
             if current_time - last_pump_time >= pump_interval and not is_pump_active:
                 is_pump_active = True
