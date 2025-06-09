@@ -16,8 +16,8 @@ from weather import get_weather
 
 # Полив
 months_range = range(5, 10)  # Месяцы с мая (5) по сентябрь (9)
-start_hour = 5  # Начало временного интервала (5:00)
-end_hour = 7    # Конец временного интервала (до 6:00)
+start_hour = 6  # Начало временного интервала (6:00)
+end_hour = 9    # Конец временного интервала (до 9:00)
 hardwater = 0  # принудительный полив
 
 
@@ -67,8 +67,8 @@ minTemp = 16
 
 # Полив на улице
 months_range9 = range(5, 10)  # Месяцы с мая (5) по сентябрь (9)
-start_hour9 = 18  # Начало временного интервала (5:00)
-end_hour9 = 19    # Конец временного интервала (до 6:00)
+start_hour9 = 4  # Начало временного интервала (5:00)
+end_hour9 = 6    # Конец временного интервала (до 6:00)
 
 
 
@@ -84,7 +84,9 @@ hardlightBath = 0  # принудительный свет
 # Баня
 hardBana = 1  # добавляем переменную для принудительного включения бака
 pump_start_time = None  # для отслеживания времени начала работы насоса
-pump_duration = 2 * 60  # продолжительность работы насоса в секундах (50 минут)
+pump_duration = 10  # Насос работает 10 секунд
+pump_interval = 5 * 60  # Насос включается каждые 5 минут
+last_pump_time = 0  # Время последнего включения насоса
 is_pump_active = True  # флаг для отслеживания состояния насоса
 
 # MQTT настройки
@@ -261,29 +263,32 @@ try:
             logging.info(f"Отопление выключено — температура: {temperature}°C, порог: {minTemp}°C")
 
         
-        """
-                if hardBana == 1:
-            if is_pump_active:
-                if pump_start_time is None:
-                    pump_start_time = time.time()  # Начинаем отсчет времени, только если насос включен
-                print("Баня-помпа включена.")
-                client.publish('bana/pump', "1")
-            elif time.time() - pump_start_time >= pump_duration:
-                # Ожидаем 2 минуты (время работы помпы) и выключаем насос
-                print("Баня-помпа выключена.")
-                client.publish('bana/pump', "0")
-                is_pump_active = False  # Останавливаем насос и меняем состояние
-                pump_start_time = None  # Обнуляем время начала работы насоса
+        # Баня управление паром
+        if hardBana == 1:
+            current_time = time.time()
 
-            # Чтобы перезапустить насос после выключения, можно добавить следующую проверку:
-            # Например, когда принудительно нужно включить насос снова, проверка может быть такая:
-            if hardBana == 1 and not is_pump_active:
-                # Перезапускаем насос
+            # Проверка: прошло ли 5 минут с последнего запуска
+            if current_time - last_pump_time >= pump_interval and not is_pump_active:
                 is_pump_active = True
-                pump_start_time = None  # Сброс времени начала работы
-                print("Перезапуск насоса.")
+                pump_start_time = current_time
+                last_pump_time = current_time
+                logging.info("Насос включён.")
                 client.publish('bana/pump', "1")
-        """
+
+            # Проверка: прошло ли 10 секунд с начала работы
+            if is_pump_active and (current_time - pump_start_time >= pump_duration):
+                is_pump_active = False
+                pump_start_time = None
+                logging.info("Насос выключен.")
+                client.publish('bana/pump', "0")
+
+        else:
+            # Если hardBana выключен, убедимся, что насос не работает
+            if is_pump_active:
+                is_pump_active = False
+                pump_start_time = None
+                logging.warning("Принудительное выключение насоса: hardBana отключен.")
+                client.publish('bana/pump', "0")
         
 
         
