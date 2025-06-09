@@ -87,7 +87,7 @@ pump_start_time = None  # для отслеживания времени нач�
 pump_duration = 10  # Насос работает 10 секунд
 pump_interval = 5 * 60  # Насос включается каждые 5 минут
 last_pump_time = 0  # Время последнего включения насоса
-is_pump_active = True  # флаг для отслеживания состояния насоса
+is_pump_active = False  # флаг для отслеживания состояния насоса
 
 # MQTT настройки
 BROKER = "37.79.202.158"
@@ -265,8 +265,8 @@ try:
         
         # Баня управление паром
         if hardBana == 1:
+            logging.debug(f"Pump logic: now={now}, current_time={current_time}, last_pump_time={last_pump_time}, active={is_pump_active}")
             current_time = time.time()
-
             # Проверка: прошло ли 5 минут с последнего запуска
             if current_time - last_pump_time >= pump_interval and not is_pump_active:
                 is_pump_active = True
