@@ -1,6 +1,6 @@
 import time
 import paho.mqtt.client as mqtt
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import logging
 
@@ -13,6 +13,11 @@ logging.basicConfig(
 
 # Импортируем функцию из модуля weather
 from weather import get_weather
+
+# [(начало_дождя, конец_дождя), ...]
+rain_periods = []
+raining_now = False
+rain_start = None
 
 # Полив
 months_range = range(5, 10)  # Месяцы с мая (5) по сентябрь (9)
@@ -68,7 +73,7 @@ minTemp = 16
 # Полив на улице
 months_range9 = range(5, 10)  # Месяцы с мая (5) по сентябрь (9)
 start_hour9 = 4  # Начало временного интервала (5:00)
-end_hour9 = 6    # Конец временного интервала (до 6:00)
+end_hour9 = 15    # Конец временного интервала (до 6:00)
 
 
 
@@ -105,26 +110,38 @@ water = 1 # 0 нет воды в бочке
 temperature = 0
 moister = 0
 
+# Функция расчетв времени  дождя для полива
+def total_rain_duration_in_hours(periods, now):
+    total = 0
+    cutoff = now - timedelta(days=1)  # только последние сутки
+    for start, end in periods:
+        # Игнорируем слишком старые
+        if end < cutoff:
+            continue
+        # Ограничиваем по суткам
+        start = max(start, cutoff)
+        delta = end - start
+        total += delta.total_seconds() / 3600
+    return total
+
 def on_message(client, userdata, message):
     global water, temperature, moister
     topic = message.topic
     payload = message.payload.decode()
 
-    print(f"****{topic}")
-
     if topic == waterSensor:
         water = int(payload)
-        print(f"Уровень воды: {water}")
+        # print(f"Уровень воды: {water}")
         logging.info(f"[MQTT] Уровень воды: {water}")
 
     elif topic == TempSensor:
         temperature = float(payload)
-        print(f"Температура в теплице: {temperature}")
+        # print(f"Температура в теплице: {temperature}")
         logging.info(f"[MQTT] Температура: {temperature}")
 
     elif topic == MoisterSensor:
         moister = float(payload)
-        print(f"Влажность почвы: {moister}")
+        # print(f"Влажность почвы: {moister}")
         logging.info(f"[MQTT] Влажность почвы: {moister}")
 
 
@@ -162,7 +179,14 @@ try:
         # Обновление времени
         now = datetime.now(ZoneInfo("Asia/Yekaterinburg"))
 
-        print(f"2HELLLLL{now}")
+        # #  Подставляем тестовые дожди
+        # rain_periods = [
+        #     (now - timedelta(hours=1), now - timedelta(minutes=30)),
+        #     (now - timedelta(minutes=20), now - timedelta(minutes=5)),
+        #     (now - timedelta(hours=26), now - timedelta(hours=25)),
+        # ]
+
+        print(f"Work OK {now}")
 
         # Получение данных о погоде
         weather_info = get_weather(api_key, latitude, longitude)
@@ -187,43 +211,74 @@ try:
         logging.info(f"Публикация: {TOPIC_PUBLISH1} → ok")
 
 
-        # Задержка на 5 секунд
-        time.sleep(5)
+        
         named_tuple = time.localtime()  # получить struct_time
         time_string = time.strftime("%m/%H:%M")
 
+        # Остлеживание дождя
+        desc = weather_info['description'].lower()
+        rain_detected = "дожд" in desc  # покрывает "дождь", "небольшой дождь", "дождливо"
+
+        # Начало дождя
+        if rain_detected and not raining_now:
+            rain_start = now
+            raining_now = True
+            print(f"[LOG] Начался дождь в {rain_start}")
+
+        # Конец дождя
+        elif not rain_detected and raining_now:
+            rain_periods.append((rain_start, now))
+            raining_now = False
+            print(f"[LOG] Дождь закончился в {now}. Текущие периоды дождя: {rain_periods}")
+            print(f"[LOG] Всего периодов дождя (включая текущий): {len(temp_rain_periods)}")
+            print(f"[LOG] Периоды дождя: {temp_rain_periods}")
+
+        # Подсчёт с учётом текущего дождя
+        temp_rain_periods = list(rain_periods)
+        if raining_now:
+            temp_rain_periods.append((rain_start, now))
+
+        # Задержка на 5 секунд
+        time.sleep(5)
+
         ########################## Полив на улице
         # Проверяем, что месяц в заданном интервале и время в пределах 05:00 - 07:00 и четный
+
+        total_hours = total_rain_duration_in_hours(temp_rain_periods, now)
+
         if (now.month in months_range9 and start_hour9 <= now.hour < end_hour9 and
-            now.day % 2 == 0): 
+            now.day % 2 == 0 and total_hours < 2): 
             client.publish('waterSystem/Valve1/in', "1")
-            print("Полив на улице включен.")
+            print("[Режим] Полив на улице включен.")
             logging.info("Полив на улице включен.")
+            rain_periods.clear()
+            raining_now = False
+            rain_start = None
         else:
             client.publish('waterSystem/Valve1/in', "0")
-            print("Полив на улице выключен.")
-            logging.info("Полив на улице выключен.")
+            # print("Полив на улице выключен.")
+            # logging.info("Полив на улице выключен.")
 
         ########################## Полив
         # Проверяем, что месяц в заданном интервале и время в пределах 15:00 - 17:00
         if now.month in months_range and start_hour <= now.hour < end_hour:
             client.publish('teplica/waterPump/in', "1")
-            print("Полив включен.")
+            print("[Режим] Полив включен.")
             logging.info("Полив включен.")
         else:
             client.publish('teplica/waterPump/in', "0")
-            print("Полив выключен.")
-            logging.info("Полив выключен.")
+            # print("Полив выключен.")
+            # logging.info("Полив выключен.")
 
         ########################## Набор воды
         if now.month in months_range7 and start_hour7 <= now.hour < end_hour7 and water == 0:
             client.publish('teplica/waterValve/in', '1')
-            print("Набор воды в бочку включен.")
+            print("[Режим] Набор воды в бочку включен.")
             logging.info("Набор воды в бочку включен.")
         else:
             client.publish('teplica/waterValve/in', '0')
-            print("Набор воды в бочку выключен.")
-            logging.info("Набор воды в бочку выключен.")
+            # print("Набор воды в бочку выключен.")
+            # logging.info("Набор воды в бочку выключен.")
 
         ########################### Освещение
         # Объединенное условие освещения для весны и лета
@@ -235,52 +290,52 @@ try:
             )
         ):
             client.publish('teplica/light/in', "1")
-            print("Освещение включено.")
+            print("[Режим] Освещение включено.")
             logging.info(f"Освещение включено — статус дня: {day_status}, время: {now.hour}")
         else:
             client.publish('teplica/light/in', "0")
-            print("Освещение выключено.")
-            logging.info(f"Освещение выключено — статус дня: {day_status}, время: {now.hour}")
+            # print("Освещение выключено.")
+            # logging.info(f"Освещение выключено — статус дня: {day_status}, время: {now.hour}")
 
         # Вентиляция
         if now.month in months_range3 and start_hour3 <= now.hour < end_hour3 and temperature > maxTemp:
             client.publish('teplica/fan/in', "1")
-            print("Вентиляция включена.")
+            print("[Режим] Вентиляция включена.")
             logging.info(f"Вентиляция включена — температура: {temperature}°C, порог: {maxTemp}°C")
         else:
             client.publish('teplica/fan/in', "0")
-            print("Вентиляция выключена.")
-            logging.info(f"Вентиляция выключена — температура: {temperature}°C, порог: {maxTemp}°C")
+            #print("Вентиляция выключена.")
+            #logging.info(f"Вентиляция выключена — температура: {temperature}°C, порог: {maxTemp}°C")
 
         # Отопление
         if now.month in months_range4 and start_hour4 <= now.hour < end_hour4 and temperature <= minTemp:
             client.publish('teplica/hot/in', "1")
-            print("Отопление включено.")
+            print("[Режим] Отопление включено.")
             logging.info(f"Отопление включено — температура: {temperature}°C, порог: {minTemp}°C")
         else:
             client.publish('teplica/hot/in', "0")
-            print("Отопление выключено.")
-            logging.info(f"Отопление выключено — температура: {temperature}°C, порог: {minTemp}°C")
+            #print("Отопление выключено.")
+            #logging.info(f"Отопление выключено — температура: {temperature}°C, порог: {minTemp}°C")
 
         
         # Баня управление паром
 
         if hardBana == 1:
             current_time = time.time()
-            logging.debug(f"Pump logic: now={now}, current_time={current_time}, last_pump_time={last_pump_time}, active={is_pump_active}")
+            # logging.debug(f"Pump logic: now={now}, current_time={current_time}, last_pump_time={last_pump_time}, active={is_pump_active}")
             # Проверка: прошло ли 5 минут с последнего запуска
             if current_time - last_pump_time >= pump_interval and not is_pump_active:
                 is_pump_active = True
                 pump_start_time = current_time
                 last_pump_time = current_time
-                logging.info("Насос включён.")
+                # logging.info("Насос включён.")
                 client.publish('bana/pump', "1")
 
             # Проверка: прошло ли 10 секунд с начала работы
             if is_pump_active and (current_time - pump_start_time >= pump_duration):
                 is_pump_active = False
                 pump_start_time = None
-                logging.info("Насос выключен.")
+                # logging.info("Насос выключен.")
                 client.publish('bana/pump', "0")
 
         else:
@@ -288,7 +343,7 @@ try:
             if is_pump_active:
                 is_pump_active = False
                 pump_start_time = None
-                logging.warning("Принудительное выключение насоса: hardBana отключен.")
+                #logging.warning("Принудительное выключение насоса: hardBana отключен.")
                 client.publish('bana/pump', "0")
         
 
@@ -298,3 +353,5 @@ try:
         print(time_string)
 except KeyboardInterrupt:
     print("Отключено.")
+
+
