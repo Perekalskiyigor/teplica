@@ -178,7 +178,7 @@ try:
     while True:
         # Обновление времени
         now = datetime.now(ZoneInfo("Asia/Yekaterinburg"))
-        print(f"Work OK {now}")
+        print(f"Work OK 24062025 16 48 {now}")
 
         # Получение данных о погоде
         weather_info = get_weather(api_key, latitude, longitude)
