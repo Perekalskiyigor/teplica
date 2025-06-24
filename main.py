@@ -178,73 +178,69 @@ try:
     while True:
         # Обновление времени
         now = datetime.now(ZoneInfo("Asia/Yekaterinburg"))
-
-        # #  Подставляем тестовые дожди
-        # rain_periods = [
-        #     (now - timedelta(hours=1), now - timedelta(minutes=30)),
-        #     (now - timedelta(minutes=20), now - timedelta(minutes=5)),
-        #     (now - timedelta(hours=26), now - timedelta(hours=25)),
-        # ]
-
         print(f"Work OK {now}")
 
         # Получение данных о погоде
         weather_info = get_weather(api_key, latitude, longitude)
 
-        # Вывод информации о погоде
+        # Инициализация переменных для данных о погоде
+        day_status = ""
+        temperature_outside = 0  # Температура снаружи (из API погоды)
+        
+        # Проверка и обработка данных о погоде
         if isinstance(weather_info, dict):
-            print(f"Погода в {weather_info['city']}:")
-            print(f"Описание: {weather_info['description']}")
-            day_status = weather_info['description']
-            print(f"Температура: {weather_info['temperature']}°C")
-            temperature = weather_info['temperature']
-            print(f"Влажность: {weather_info['humidity']}%")
-            print(f"Скорость ветра: {weather_info['wind_speed']} м/с")
+            print(f"Погода в {weather_info.get('city', 'неизвестно')}:")
+            
+            # Безопасное получение данных с значениями по умолчанию
+            day_status = weather_info.get('description', '')
+            temperature_outside = weather_info.get('temperature', 0)
+            humidity = weather_info.get('humidity', 0)
+            wind_speed = weather_info.get('wind_speed', 0)
+            
+            print(f"Описание: {day_status}")
+            print(f"Температура: {temperature_outside}°C")
+            print(f"Влажность: {humidity}%")
+            print(f"Скорость ветра: {wind_speed} м/с")
 
-            logging.info(f"Погода: {day_status}, Темп: {temperature}°C, Влажн: {weather_info['humidity']}%, Ветер: {weather_info['wind_speed']} м/с")
+            logging.info(f"Погода: {day_status}, Темп: {temperature_outside}°C, Влажн: {humidity}%, Ветер: {wind_speed} м/с")
+            
+            # Обработка дождя только если данные получены успешно
+            desc = day_status.lower()
+            rain_detected = "дожд" in desc  # покрывает "дождь", "небольшой дождь", "дождливо"
+            
+            # Начало дождя
+            if rain_detected and not raining_now:
+                rain_start = now
+                raining_now = True
+                print(f"[LOG] Начался дождь в {rain_start}")
+
+            # Конец дождя
+            elif not rain_detected and raining_now:
+                rain_periods.append((rain_start, now))
+                raining_now = False
+                print(f"[LOG] Дождь закончился в {now}. Текущие периоды дождя: {rain_periods}")
+                print(f"[LOG] Всего периодов дождя: {len(rain_periods)}")
+
+            # Подсчёт с учётом текущего дождя
+            temp_rain_periods = list(rain_periods)
+            if raining_now:
+                temp_rain_periods.append((rain_start, now))
         else:
             print(weather_info)
             logging.warning(f"Ошибка погоды: {weather_info}")
+            # Если данные о погоде не получены, используем пустые периоды дождя
+            temp_rain_periods = []
+            day_status = "неизвестно"
 
         client.publish(TOPIC_PUBLISH1, "ok")
         print(f"Опубликовано в {TOPIC_PUBLISH1}: ok")
         logging.info(f"Публикация: {TOPIC_PUBLISH1} → ok")
 
-
-        
-        named_tuple = time.localtime()  # получить struct_time
+        named_tuple = time.localtime()
         time_string = time.strftime("%m/%H:%M")
 
-        # Остлеживание дождя
-        desc = weather_info['description'].lower()
-        rain_detected = "дожд" in desc  # покрывает "дождь", "небольшой дождь", "дождливо"
-
-        # Начало дождя
-        if rain_detected and not raining_now:
-            rain_start = now
-            raining_now = True
-            print(f"[LOG] Начался дождь в {rain_start}")
-
-        # Конец дождя
-        elif not rain_detected and raining_now:
-            rain_periods.append((rain_start, now))
-            raining_now = False
-            print(f"[LOG] Дождь закончился в {now}. Текущие периоды дождя: {rain_periods}")
-            print(f"[LOG] Всего периодов дождя (включая текущий): {len(temp_rain_periods)}")
-            print(f"[LOG] Периоды дождя: {temp_rain_periods}")
-
-        # Подсчёт с учётом текущего дождя
-        temp_rain_periods = list(rain_periods)
-        if raining_now:
-            temp_rain_periods.append((rain_start, now))
-
-        # Задержка на 5 секунд
-        time.sleep(5)
-
-        ########################## Полив на улице
-        # Проверяем, что месяц в заданном интервале и время в пределах 05:00 - 07:00 и четный
-
-        total_hours = total_rain_duration_in_hours(temp_rain_periods, now)
+        # Подсчет общего времени дождя за последние сутки
+        total_hours = total_rain_duration_in_hours(temp_rain_periods, now) if temp_rain_periods else 0
 
         if (now.month in months_range9 and start_hour9 <= now.hour < end_hour9 and
             now.day % 2 == 0 and total_hours < 2): 
@@ -348,7 +344,7 @@ try:
         
 
         
-        
+        time.sleep(5)
  
         print(time_string)
 except KeyboardInterrupt:
