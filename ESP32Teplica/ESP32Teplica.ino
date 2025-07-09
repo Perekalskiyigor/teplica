@@ -33,8 +33,8 @@ unsigned long previousMillis = 0;  // Переменная для отслежи
 const long interval = 2000;        // Интервал 2 секунды
 
 // Настройки WiFi и MQTT
-const char* ssid = "POCO X3 Pro";
-const char* password = "Fnkfynblf1987";
+const char* ssid = "UFSB";
+const char* password = "Fnkfynblf!(*&14";
 const char* mqtt_server = "37.79.202.158";
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -337,6 +337,12 @@ void reconnect() {
 
 void setup() {
 
+  // Прошивка удаленно
+  // Настройка OTA
+  //httpUpdater.setup(&HttpServer, OTAPATH, OTAUSER, OTAPASSWORD);
+  //HttpServer.onNotFound(handleNotFound);
+  //HttpServer.begin();
+
   // Настройка пинов
   pinMode(Watering, OUTPUT);
   pinMode(lighting, OUTPUT); 
@@ -358,11 +364,6 @@ void setup() {
   setup_wifi();
   client.setServer(mqtt_server, 1883);
   client.setCallback(callback);
-
-  // Инициализация OTA
-  httpUpdater.setup(&HttpServer, OTAPATH, OTAUSER, OTAPASSWORD);
-  HttpServer.onNotFound(handleNotFound);
-  HttpServer.begin();
 }
 
 void loop() {
@@ -371,7 +372,7 @@ void loop() {
   }
   client.loop();
 
-  
+  HttpServer.handleClient(); // Прослушивание HTTP-запросов от клиентов
 
   // Проверяем соединение с Wi-Fi каждые 10 секунд и публикуем уровень сигнала
   if (millis() % 10000 == 0) { // Проверяем каждые 10 секунд
@@ -428,25 +429,10 @@ void loop() {
           "Автоотключение: сработал таймаут 2 часа");
     }
   }
-  HttpServer.handleClient(); // Прослушивание HTTP-запросов от клиентов
 }
 
 // Для удаленной прошивки
 /* Выводить надпись, если такой страницы ненайдено */
-// Обработчик для несуществующих страниц
 void handleNotFound() {
-  String message = "404: Not found\n\n";
-  message += "URI: ";
-  message += HttpServer.uri();
-  message += "\nMethod: ";
-  message += (HttpServer.method() == HTTP_GET) ? "GET" : "POST";
-  message += "\nArguments: ";
-  message += HttpServer.args();
-  message += "\n";
-  
-  for (uint8_t i = 0; i < HttpServer.args(); i++) {
-    message += " " + HttpServer.argName(i) + ": " + HttpServer.arg(i) + "\n";
-  }
-  
-  HttpServer.send(404, "text/plain", message);
+  HttpServer.send(404, "text/plain", "404: Not found");
 }
