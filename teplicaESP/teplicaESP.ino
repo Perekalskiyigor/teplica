@@ -39,7 +39,16 @@ const long interval = 2000;         // Интервал 5 секунд
 
 
 // Настройки WiFi и MQTT
-const char* ssid = "UFSB";
+const char* wifiList[] = {
+  "UFSB_V",
+  "UFSB_BAN",
+  "UFSB",
+  "UFSB_G"
+};
+
+const int wifiCount = sizeof(wifiList) / sizeof(wifiList[0]);
+String connectedSsid = "";
+
 const char* password = "Fnkfynblf!(*&14";
 const char* mqtt_server = "37.79.202.158";
 WiFiClient espClient;
@@ -48,27 +57,61 @@ unsigned long lastMsg = 0;
 #define MSG_BUFFER_SIZE  (50)
 char msg[MSG_BUFFER_SIZE];
 
+
+
+
 void setup_wifi() {
   delay(10);
+
   Serial.println();
-  Serial.print("Подключение к ");
-  Serial.println(ssid);
+  Serial.println("Поиск доступной WiFi сети...");
 
   WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
 
-  while (WiFi.status()!= WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  while (WiFi.status() != WL_CONNECTED) {
+
+    for (int i = 0; i < wifiCount; i++) {
+      Serial.print("Пробую подключиться к: ");
+      Serial.println(wifiList[i]);
+
+      WiFi.disconnect();
+      delay(500);
+
+      WiFi.begin(wifiList[i], password);
+
+      unsigned long startAttemptTime = millis();
+
+      while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < 10000) {
+        delay(500);
+        Serial.print(".");
+      }
+
+      Serial.println();
+
+      if (WiFi.status() == WL_CONNECTED) {
+        connectedSsid = String(wifiList[i]);
+
+        Serial.println("WiFi подключено");
+        Serial.print("SSID: ");
+        Serial.println(connectedSsid);
+        Serial.print("IP адрес: ");
+        Serial.println(WiFi.localIP());
+
+        randomSeed(micros());
+        return;
+      }
+
+      Serial.print("Не удалось подключиться к ");
+      Serial.println(wifiList[i]);
+    }
+
+    Serial.println("Ни одна сеть не подошла, повтор через 5 секунд...");
+    delay(5000);
   }
-
-  randomSeed(micros());
-
-  Serial.println("");
-  Serial.println("WiFi подключено");
-  Serial.println("IP адрес: ");
-  Serial.println(WiFi.localIP());
 }
+
+
+
 
 
 
@@ -423,7 +466,7 @@ void loop() {
 
     // Публикация IP-адреса в MQTT-топике
     client.publish("waterSystem/ipAddress", ipAddress.c_str());
-
+    client.publish("waterSystem/wifiSsid", connectedSsid.c_str());
     client.publish("waterSystem/Version", "1.0");
   }
 
